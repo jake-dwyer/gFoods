@@ -21,6 +21,7 @@ SEARCH_LIMIT = 5
 ENTITY_CHUNK_SIZE = 40
 TITLE_CHUNK_SIZE = 40
 THROTTLE_SECONDS = 0.02
+PROGRESS_PREFIX = "[wiki]"
 
 OPEN_TREE_FIELD = "synonyms_open_tree_of_life"
 WIKI_FIELD = "synonyms_wiki_search"
@@ -173,8 +174,19 @@ def fetch_entities_for_titles(
     unmatched: Set[Tuple[str, str]] = set()
     unresolved_titles: Set[str] = set()
 
+    if not titles:
+        return key_to_entity, key_to_qid, qid_to_entity, unmatched
+
+    total_batches = (len(titles) + TITLE_CHUNK_SIZE - 1) // TITLE_CHUNK_SIZE
+
     for start in range(0, len(titles), TITLE_CHUNK_SIZE):
         batch = titles[start : start + TITLE_CHUNK_SIZE]
+        batch_index = start // TITLE_CHUNK_SIZE + 1
+        print(
+            f"{PROGRESS_PREFIX} fetching title batch {batch_index}/{total_batches} "
+            f"({len(batch)} titles)",
+            flush=True,
+        )
         params = {
             "action": "wbgetentities",
             "format": "json",
@@ -224,7 +236,12 @@ def fetch_entities_for_titles(
 
     single_title_cache: Dict[str, Tuple[str, dict]] = {}
 
-    for title in unresolved_titles:
+    unresolved_titles = sorted(unresolved_titles)
+    for idx, title in enumerate(unresolved_titles, start=1):
+        print(
+            f"{PROGRESS_PREFIX} resolving leftover title {idx}/{len(unresolved_titles)}: {title}",
+            flush=True,
+        )
         if title in single_title_cache:
             result = single_title_cache[title]
         else:
@@ -339,6 +356,11 @@ def main() -> None:
         index_field = reader.fieldnames[0]
         rows = list(reader)
 
+    print(
+        f"{PROGRESS_PREFIX} loaded {len(rows)} rows from {INPUT_PATH}",
+        flush=True,
+    )
+
     # Map names to candidate queries
     name_candidates: Dict[Tuple[str, str], List[str]] = {}
     for idx, row in enumerate(rows):
@@ -356,11 +378,21 @@ def main() -> None:
         if title:
             title_to_keys.setdefault(title, []).append(key)
 
+    print(
+        f"{PROGRESS_PREFIX} prepared {len(name_candidates)} unique name keys "
+        f"across {len(title_to_keys)} primary titles",
+        flush=True,
+    )
+
     key_to_entity, key_to_qid, qid_to_entity, unmatched_keys = fetch_entities_for_titles(
         title_to_keys
     )
 
     if unmatched_keys:
+        print(
+            f"{PROGRESS_PREFIX} falling back to search for {len(unmatched_keys)} keys",
+            flush=True,
+        )
         query_cache: Dict[str, Optional[str]] = {}
         fallback_qids: Dict[Tuple[str, str], str] = {}
         for key in unmatched_keys:
@@ -383,6 +415,12 @@ def main() -> None:
                 key_to_entity[key] = entity
                 key_to_qid[key] = qid
                 qid_to_entity[qid] = entity
+        unresolved_after_search = unmatched_keys - set(fallback_qids.keys())
+        if unresolved_after_search:
+            print(
+                f"{PROGRESS_PREFIX} no Wikidata entity found for {len(unresolved_after_search)} keys",
+                flush=True,
+            )
 
     entity_data = qid_to_entity.copy()
 
@@ -402,6 +440,10 @@ def main() -> None:
     # Fetch referenced entities for P1420 labels
     missing_qids = referenced_qids - set(entity_data.keys())
     if missing_qids:
+        print(
+            f"{PROGRESS_PREFIX} fetching {len(missing_qids)} synonym-linked entities",
+            flush=True,
+        )
         entity_data.update(fetch_entities(missing_qids))
 
     key_to_synonyms: Dict[Tuple[str, str], str] = {}
@@ -462,6 +504,7 @@ def main() -> None:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         writer.writerows(updated_rows)
+    print(f"{PROGRESS_PREFIX} wrote results to {OUTPUT_PATH}", flush=True)
 
 
 if __name__ == "__main__":
