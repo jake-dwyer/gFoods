@@ -105,14 +105,8 @@ Helpful flags:
 
 1. **Back up** `ndm_foods.csv`.
 2. **Run the scrapers sequentially** (OpenTree → Wikidata → NCBI). Each script only touches its own column, so order is flexible but avoid parallel runs to prevent throttling issues.
-3. **Spot-check results**:
-   ```bash
-   csvcut -c food_com,synonyms_open_tree_of_life ndm_foods.csv | head
-   csvcut -c food_com,synonyms_wiki_search ndm_foods.csv | head
-   csvcut -c food_com,synonyms_ncbi ndm_foods.csv | head
-   ```
-4. **Version control**: commit after each successful script to isolate changes per source.
-5. **Error handling**: scripts log warnings when a lookup fails; rerun those specific names or inspect the CSV to decide on manual fixes.
+3. **Version control**: commit after each successful script to isolate changes per source.
+4. **Error handling**: scripts log warnings when a lookup fails; rerun those specific names or inspect the CSV to decide on manual fixes.
 
 ---
 
