@@ -137,11 +137,10 @@ No other runtime dependencies are required.
 
 ---
 
-## 9. Future Enhancements
+## 9. TODO
 
-- Cache resolved IDs/synonyms to disk to resume long runs.
-- Parallelise with caution (respecting rate limits) for NCBI.
-- Add unit tests for parsing functions (`extract_synonyms`, etc.).
-- Build a single orchestrator script that runs all three stages with checkpoints.
-
-Happy scraping! If you add new sources or change column layouts, update this README so future runs stay aligned.
+- Scrape for missing taxon names
+- Scrape for missing common names
+- Clean data, remove duplicates
+- Add N/A fields when no such scientific name exists / synonyms etc.
+- Add another script to path over the enitre CSV, returning only synonyms that all 3 sources recognize.
