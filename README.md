@@ -1,10 +1,12 @@
 # gFoods Synonym Scrapers
 
-This workspace holds a mock food taxonomy dataset (`ndm_foods.csv`) and three standalone Python scripts that populate synonym columns from different sources:
+This workspace holds a mock food taxonomy dataset (`ndm_foods.csv`) and utilities for enriching and cleaning it:
 
 - `scrape_opentree_synonyms.py` — Open Tree of Life
 - `scrape_wikisearch_synonyms.py` — Wikidata (wiki search)
 - `scrape_ncbi_synonyms.py` — NCBI Taxonomy
+- `dedupe_ndm_foods.py` — removes duplicate rows while preserving column order
+- `build_synonym_overlap.py` — writes an all-sources overlap column
 
 Each script reads the CSV, fills its corresponding synonym column, and rewrites the file (unless you target a different output path).
 
@@ -45,7 +47,45 @@ cp ndm_foods.csv ndm_foods.backup.csv
 
 ---
 
-## 3. Open Tree of Life Synonyms
+## 3. Deduplicate the Dataset
+
+`dedupe_ndm_foods.py` removes duplicate rows based on one or more columns (defaults to `food_com`).
+
+```bash
+.venv/bin/python dedupe_ndm_foods.py           # writes ndm_foods_deduped.csv
+.venv/bin/python dedupe_ndm_foods.py --in-place  # overwrite ndm_foods.csv
+```
+
+Use `-c/--columns` to change the deduplication key. For example, deduplicate by the scientific name with:
+
+```bash
+.venv/bin/python dedupe_ndm_foods.py -c food_sci
+```
+
+Review the summary printed after each run to confirm how many rows were removed.
+
+---
+
+## 4. Synonym Overlap
+
+`build_synonym_overlap.py` scans the three synonym columns and captures values shared across all of them in `synonyms_all_sources`.
+
+```bash
+.venv/bin/python build_synonym_overlap.py             # writes ndm_foods_with_overlap.csv
+.venv/bin/python build_synonym_overlap.py --in-place  # overwrite the input file
+```
+
+Flags worth noting:
+
+- `-o/--output` — choose a different target CSV.
+- `--output-column` — change the destination column name.
+- `--case-sensitive` — require exact casing instead of the default case-insensitive match.
+
+The script reports how many rows contained overlaps and the total strings written so you can gauge coverage.
+
+---
+
+## 5. Open Tree of Life Synonyms
 
 ```bash
 .venv/bin/python scrape_opentree_synonyms.py
@@ -59,7 +99,7 @@ Approximate runtime: ~5 minutes for ~20k records.
 
 ---
 
-## 4. Wikidata Synonyms
+## 6. Wikidata Synonyms
 
 ```bash
 .venv/bin/python scrape_wikisearch_synonyms.py
@@ -79,7 +119,7 @@ Use the `--limit` flag to process a subset and inspect results before committing
 
 ---
 
-## 5. NCBI Synonyms
+## 7. NCBI Synonyms
 
 ```bash
 .venv/bin/python scrape_ncbi_synonyms.py
@@ -101,16 +141,17 @@ Helpful flags:
 
 ---
 
-## 6. Workflow Suggestions
+## 8. Workflow Suggestions
 
 1. **Back up** `ndm_foods.csv`.
 2. **Run the scrapers sequentially** (OpenTree → Wikidata → NCBI). Each script only touches its own column, so order is flexible but avoid parallel runs to prevent throttling issues.
-3. **Version control**: commit after each successful script to isolate changes per source.
-4. **Error handling**: scripts log warnings when a lookup fails; rerun those specific names or inspect the CSV to decide on manual fixes.
+3. **Clean and consolidate**: run `dedupe_ndm_foods.py` to drop duplicates, then `build_synonym_overlap.py` to refresh the shared-synonym column.
+4. **Version control**: commit after each successful script to isolate changes per source.
+5. **Error handling**: scripts log warnings when a lookup fails; rerun those specific names or inspect the CSV to decide on manual fixes.
 
 ---
 
-## 7. Requirements Summary
+## 9. Requirements Summary
 
 - Python 3.10+
 - `requests`
@@ -120,7 +161,7 @@ No other runtime dependencies are required.
 
 ---
 
-## 8. Troubleshooting
+## 10. Troubleshooting
 
 | Issue | Likely Cause | Fix |
 |-------|--------------|-----|
@@ -130,11 +171,3 @@ No other runtime dependencies are required.
 | NCBI API 429 errors | Too many requests too quickly | increase `THROTTLE_SECONDS` constant |
 
 ---
-
-## 9. TODO
-
-- Scrape for missing taxon names
-- Scrape for missing common names
-- Clean data, remove duplicates
-- Add N/A fields when no such scientific name exists / synonyms etc.
-- Add another script to path over the enitre CSV, returning only synonyms that all 3 sources recognize.
