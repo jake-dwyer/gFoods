@@ -7,6 +7,7 @@ This workspace holds a mock food taxonomy dataset (`ndm_foods.csv`) and utilitie
 - `scrape_ncbi_synonyms.py` — NCBI Taxonomy
 - `dedupe_ndm_foods.py` — removes duplicate rows while preserving column order
 - `build_synonym_overlap.py` — writes an all-sources overlap column
+- `match_foods.py` — groups near-duplicate common names, aggregates scientific names, and can compress rows
 
 Each script reads the CSV, fills its corresponding synonym column, and rewrites the file (unless you target a different output path).
 
@@ -25,6 +26,37 @@ pip install -r requirements.txt
 > **Tip:** All commands below assume you are inside the virtual environment you just created.
 
 ---
+
+## 2.1 Matching and Grouping Foods (`match_foods.py`)
+
+This script cleans names (drops “raw”, normalises separators) and groups similar common names using exact + bigram fuzzy matching (length-aware thresholds: long names need ~0.9, short ~0.6). It fills missing common names with the scientific name when available and aggregates all common/scientific names for each group.
+
+Outputs:
+- Default: one row per original index with merged names (`<input>_matched.csv`).
+- With `--collapse-groups`: one row per merged group (`<input>_matched_collapsed.csv`).
+
+Flags:
+- `--use-openai` (optional): send borderline matches to ChatGPT. Requires `OPENAI_API_KEY` (loadable from a `.env` file; `.env` is in `.gitignore`).
+- `--max-openai-pairs` / `--openai-batch-size`: control how many borderline pairs are reviewed.
+- `--collapse-groups`: shrink to one row per merged group.
+
+Examples:
+```bash
+# Default, covers all rows
+.venv/bin/python match_foods.py
+
+# With ChatGPT review of borderline pairs (needs OPENAI_API_KEY in environment or .env)
+.venv/bin/python match_foods.py --use-openai --max-openai-pairs 2000 --openai-batch-size 20
+
+# Collapse to one row per merged group
+.venv/bin/python match_foods.py --collapse-groups
+
+# Combine collapse + AI review
+.venv/bin/python match_foods.py --collapse-groups --use-openai
+
+# One-off env var if you don't want a .env file
+OPENAI_API_KEY=sk-... .venv/bin/python match_foods.py --use-openai
+```
 
 ## 2. Data File
 
