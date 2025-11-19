@@ -27,37 +27,6 @@ pip install -r requirements.txt
 
 ---
 
-## 2.1 Matching and Grouping Foods (`match_foods.py`)
-
-This script cleans names (drops “raw”, normalises separators) and groups similar common names using exact + bigram fuzzy matching (length-aware thresholds: long names need ~0.9, short ~0.6). It fills missing common names with the scientific name when available and aggregates all common/scientific names for each group.
-
-Outputs:
-- Default: one row per original index with merged names (`<input>_matched.csv`).
-- With `--collapse-groups`: one row per merged group (`<input>_matched_collapsed.csv`).
-
-Flags:
-- `--use-openai` (optional): send borderline matches to ChatGPT. Requires `OPENAI_API_KEY` (loadable from a `.env` file; `.env` is in `.gitignore`).
-- `--max-openai-pairs` / `--openai-batch-size`: control how many borderline pairs are reviewed.
-- `--collapse-groups`: shrink to one row per merged group.
-
-Examples:
-```bash
-# Default, covers all rows
-.venv/bin/python match_foods.py
-
-# With ChatGPT review of borderline pairs (needs OPENAI_API_KEY in environment or .env)
-.venv/bin/python match_foods.py --use-openai --max-openai-pairs 2000 --openai-batch-size 20
-
-# Collapse to one row per merged group
-.venv/bin/python match_foods.py --collapse-groups
-
-# Combine collapse + AI review
-.venv/bin/python match_foods.py --collapse-groups --use-openai
-
-# One-off env var if you don't want a .env file
-OPENAI_API_KEY=sk-... .venv/bin/python match_foods.py --use-openai
-```
-
 ## 2. Data File
 
 The canonical CSV is `ndm_foods.csv`. Columns:
@@ -79,26 +48,7 @@ cp ndm_foods.csv ndm_foods.backup.csv
 
 ---
 
-## 3. Deduplicate the Dataset
-
-`dedupe_ndm_foods.py` removes duplicate rows based on one or more columns (defaults to `food_com`).
-
-```bash
-.venv/bin/python dedupe_ndm_foods.py           # writes ndm_foods_deduped.csv
-.venv/bin/python dedupe_ndm_foods.py --in-place  # overwrite ndm_foods.csv
-```
-
-Use `-c/--columns` to change the deduplication key. For example, deduplicate by the scientific name with:
-
-```bash
-.venv/bin/python dedupe_ndm_foods.py -c food_sci
-```
-
-Review the summary printed after each run to confirm how many rows were removed.
-
----
-
-## 4. Synonym Overlap
+## 3. Synonym Overlap
 
 `build_synonym_overlap.py` scans the three synonym columns and captures values shared across all of them in `synonyms_all_sources`.
 
@@ -117,7 +67,7 @@ The script reports how many rows contained overlaps and the total strings writte
 
 ---
 
-## 5. Open Tree of Life Synonyms
+## 4. Open Tree of Life Synonyms
 
 ```bash
 .venv/bin/python scrape/scrape_opentree_synonyms.py
@@ -131,8 +81,9 @@ Approximate runtime: ~5 minutes for ~20k records.
 
 ---
 
-## 6. Wikidata Synonyms
+## 5. Wikidata Synonyms
 
+```bash
 .venv/bin/python scrape/scrape_wikisearch_synonyms.py
 ```
 
@@ -142,6 +93,7 @@ Approximate runtime: ~5 minutes for ~20k records.
 
 This job is the slowest; expect 30–40 minutes. For smoke tests:
 
+```bash
 .venv/bin/python scrape/scrape_wikisearch_synonyms.py --limit 500 --output ndm_wiki_sample.csv
 ```
 
@@ -149,8 +101,9 @@ Use the `--limit` flag to process a subset and inspect results before committing
 
 ---
 
-## 7. NCBI Synonyms
+## 6. NCBI Synonyms
 
+```bash
 .venv/bin/python scrape/scrape_ncbi_synonyms.py
 ```
 
@@ -160,6 +113,7 @@ Use the `--limit` flag to process a subset and inspect results before committing
 
 Helpful flags:
 
+```bash
 .venv/bin/python scrape/scrape_ncbi_synonyms.py --limit 500 --output ndm_ncbi_sample.csv
 ```
 
@@ -169,13 +123,43 @@ Helpful flags:
 
 ---
 
-## 8. Workflow Suggestions
+## 7. Matching and Grouping Foods (`match_foods.py`)
+
+This script cleans names (drops “raw”, normalises separators, strips accents/`?`), groups similar common names using exact + bigram fuzzy matching (length-aware thresholds: long names need ~0.9, short ~0.6; borderline pairs can go to ChatGPT), and writes a CSV with the same headers as the input.
+
+Key behaviours (current branch):
+- Drops exact duplicate rows.
+- For exact common-name duplicates, keeps the row with the richest synonyms (`synonyms_all_sources` preferred, then total synonyms across sources, then presence of `food_sci`).
+- Exact match first, then fuzzy match. Pepper guard avoids cross-pepper merges. Borderline pairs optionally sent to ChatGPT (`--use-openai`, needs `OPENAI_API_KEY` in `.env`).
+- Aggregates common names per group but preserves the row’s scientific name; after grouping, prunes duplicate common names again to the richest synonym row.
+- Output headers mirror the input (e.g., index, `food_com`, `food_sci`, `synonyms_*`, `synonyms_all_sources`).
+
+Examples:
+```bash
+# Default (no OpenAI)
+.venv/bin/python match_foods.py -i ndm_foods_with_overlap.csv
+
+# With ChatGPT review of borderline pairs
+.venv/bin/python match_foods.py -i ndm_foods_with_overlap.csv --use-openai --max-openai-pairs 50 --openai-batch-size 10
+
+# Collapse to one row per merged group
+.venv/bin/python match_foods.py -i ndm_foods_with_overlap.csv --collapse-groups
+```
+
+## 8. Full Workflow (this branch)
 
 1. **Back up** `ndm_foods.csv`.
-2. **Run the scrapers sequentially** (OpenTree → Wikidata → NCBI). Each script only touches its own column, so order is flexible but avoid parallel runs to prevent throttling issues.
-3. **Clean and consolidate**: run `dedupe_ndm_foods.py` to drop duplicates, then `build_synonym_overlap.py` to refresh the shared-synonym column.
-4. **Version control**: commit after each successful script to isolate changes per source.
-5. **Error handling**: scripts log warnings when a lookup fails; rerun those specific names or inspect the CSV to decide on manual fixes.
+2. **Scrape synonyms** (any order, avoid parallel runs):
+   - `.venv/bin/python scrape/scrape_opentree_synonyms.py`
+   - `.venv/bin/python scrape/scrape_wikisearch_synonyms.py`
+   - `.venv/bin/python scrape/scrape_ncbi_synonyms.py`
+   Each overwrites only its target column in `ndm_foods.csv` by default; use `-o` to write elsewhere.
+3. **Build overlap**: `.venv/bin/python build_synonym_overlap.py` (default output `ndm_foods_with_overlap.csv`; `--in-place` to overwrite).
+4. **Match/clean**: `.venv/bin/python match_foods.py -i ndm_foods_with_overlap.csv [--use-openai --max-openai-pairs N --openai-batch-size M]`
+   - Keeps the original column schema.
+   - Prefers rows with richer synonyms for duplicate common names; blank or poorer rows are dropped.
+   - Fuzzy thresholds as above; peppers guarded.
+   - Outputs `<input>_matched.csv`.
 
 ---
 
