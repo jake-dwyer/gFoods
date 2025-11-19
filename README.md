@@ -2,9 +2,9 @@
 
 This workspace holds a mock food taxonomy dataset (`ndm_foods.csv`) and utilities for enriching and cleaning it:
 
-- `scrape_opentree_synonyms.py` — Open Tree of Life
-- `scrape_wikisearch_synonyms.py` — Wikidata (wiki search)
-- `scrape_ncbi_synonyms.py` — NCBI Taxonomy
+- `scrape/scrape_opentree_synonyms.py` — Open Tree of Life
+- `scrape/scrape_wikisearch_synonyms.py` — Wikidata (wiki search)
+- `scrape/scrape_ncbi_synonyms.py` — NCBI Taxonomy
 - `dedupe_ndm_foods.py` — removes duplicate rows while preserving column order
 - `build_synonym_overlap.py` — writes an all-sources overlap column
 - `match_foods.py` — groups near-duplicate common names, aggregates scientific names, and can compress rows
@@ -120,7 +120,7 @@ The script reports how many rows contained overlaps and the total strings writte
 ## 5. Open Tree of Life Synonyms
 
 ```bash
-.venv/bin/python scrape_opentree_synonyms.py
+.venv/bin/python scrape/scrape_opentree_synonyms.py
 ```
 
 - Batches scientific names (40 per request) against Open Tree of Life’s TNRS API.
@@ -133,8 +133,7 @@ Approximate runtime: ~5 minutes for ~20k records.
 
 ## 6. Wikidata Synonyms
 
-```bash
-.venv/bin/python scrape_wikisearch_synonyms.py
+.venv/bin/python scrape/scrape_wikisearch_synonyms.py
 ```
 
 - Resolves each entry to a Wikidata item via `wbgetentities` (falling back to `wbsearchentities`).
@@ -143,8 +142,7 @@ Approximate runtime: ~5 minutes for ~20k records.
 
 This job is the slowest; expect 30–40 minutes. For smoke tests:
 
-```bash
-.venv/bin/python scrape_wikisearch_synonyms.py --limit 500 --output ndm_wiki_sample.csv
+.venv/bin/python scrape/scrape_wikisearch_synonyms.py --limit 500 --output ndm_wiki_sample.csv
 ```
 
 Use the `--limit` flag to process a subset and inspect results before committing to the full dataset. You can also direct output elsewhere while testing.
@@ -153,8 +151,7 @@ Use the `--limit` flag to process a subset and inspect results before committing
 
 ## 7. NCBI Synonyms
 
-```bash
-.venv/bin/python scrape_ncbi_synonyms.py
+.venv/bin/python scrape/scrape_ncbi_synonyms.py
 ```
 
 - Uses NCBI E-utilities (`esearch` + `efetch`) to find Taxonomy IDs and pull synonym/common-name lists.
@@ -163,8 +160,7 @@ Use the `--limit` flag to process a subset and inspect results before committing
 
 Helpful flags:
 
-```bash
-.venv/bin/python scrape_ncbi_synonyms.py --limit 500 --output ndm_ncbi_sample.csv
+.venv/bin/python scrape/scrape_ncbi_synonyms.py --limit 500 --output ndm_ncbi_sample.csv
 ```
 
 `--limit` lets you test on a small slice; `--output` sets a different target CSV (default overwrites the input).
