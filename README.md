@@ -5,7 +5,6 @@ This workspace holds a mock food taxonomy dataset (`ndm_foods.csv`) and utilitie
 - `scrape/scrape_opentree_synonyms.py` — Open Tree of Life
 - `scrape/scrape_wikisearch_synonyms.py` — Wikidata (wiki search)
 - `scrape/scrape_ncbi_synonyms.py` — NCBI Taxonomy
-- `dedupe_ndm_foods.py` — removes duplicate rows while preserving column order
 - `build_synonym_overlap.py` — writes an all-sources overlap column
 - `match_foods.py` — groups near-duplicate common names, aggregates scientific names, and can compress rows
 
